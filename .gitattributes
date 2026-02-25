@@ -1,0 +1,6 @@
+*.ttf   binary
+*.woff2 binary
+*.html  text
+*.css   text
+*.js    text
+*md     text

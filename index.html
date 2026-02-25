@@ -1,37 +1,266 @@
-function renderSidebar() {
-    ...
-}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <script src="changes.js"></script>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/font/css/fontClass.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraction</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --sidebar-bg: #fbfbfa;
+        --text: #1a1a1a;
+        --text-dim: #8a8a8e;
+        --accent: #007aff;
+        --border: rgba(0, 0, 0, 0.05);
+        --hover: rgba(0, 0, 0, 0.03);
+        --toolbar: #ffffff;
+        --radius: 10px;
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
 
-let menuTarget = null;
+      body.dark-mode {
+        --bg: #0a0a0a;
+        --sidebar-bg: #121212;
+        --text: #f5f5f7;
+        --text-dim: #7a7a7a;
+        --border: rgba(255, 255, 255, 0.05);
+        --hover: rgba(255, 255, 255, 0.05);
+        --toolbar: #1c1c1e;
+      }
 
-function contextPin() {
-    if (!menuTarget) return;
-    const idx = state.notes.indexOf(menuTarget);
-    if (idx > -1) {
-        state.notes[idx].pinned = !state.notes[idx].pinned;
+      * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+      body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; display: flex; height: 100vh; overflow: hidden; transition: background 0.3s ease; }
+
+      #sidebar { width: 260px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 32px 16px; }
+      .brand { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 2.5px; padding: 12px; margin-bottom: 24px; color: var(--text); opacity: 0.8; }
+      #notesList { flex: 1; overflow-y: auto; }
+      .folder-group { margin-bottom: 32px; }
+      .folder-header { font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; padding: 8px 12px; letter-spacing: 1px; }
+
+      .note-item { padding: 10px 14px; border-radius: var(--radius); margin: 2px 0; cursor: pointer; font-size: 14px; color: var(--text); display: flex; justify-content: space-between; align-items: center; transition: all 0.2s var(--ease); }
+      .note-item:hover { background: var(--hover); transform: translateX(2px); }
+      .note-item.active { background: var(--hover); font-weight: 600; color: var(--accent); }
+
+      #contextMenu { position: fixed; background: var(--toolbar); border: 1px solid var(--border); border-radius: 12px; padding: 6px; z-index: 2000; display: none; box-shadow: 0 12px 30px rgba(0,0,0,0.15); min-width: 170px; backdrop-filter: blur(10px); }
+      .menu-item { padding: 10px 14px; font-size: 13px; cursor: pointer; border-radius: 8px; color: var(--text); display: flex; justify-content: space-between; }
+      .menu-item:hover { background: var(--accent); color: white; }
+
+      #main-container { flex: 1; display: flex; flex-direction: column; position: relative; }
+      .toolbar { position: absolute; top: 32px; right: 40px; background: var(--toolbar); border: 1px solid var(--border); padding: 6px; border-radius: 14px; display: flex; gap: 4px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.05); align-items: center; }
+
+      #editor-scroll { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+      #editor-content { max-width: 760px; margin: 0 auto; width: 100%; padding: 140px 60px; }
+      #titleInput { width: 100%; background: transparent; border: none; outline: none; font-size: 44px; font-weight: 800; color: var(--text); margin-bottom: 24px; letter-spacing: -1.5px; }
+      #content { outline: none; font-size: 18px; line-height: 1.7; color: var(--text); min-height: 60vh; }
+
+      .tool-btn { background: transparent; border: none; color: var(--text-dim); padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+      .tool-btn:hover { background: var(--hover); color: var(--text); }
+      .tool-btn.active { background: var(--accent); color: white; }
+
+      .btn-action { background: transparent; color: var(--text-dim); border: none; font-weight: 600; text-align: left; padding: 10px 14px; border-radius: var(--radius); cursor: pointer; margin-bottom: 4px; font-size: 13px; transition: 0.2s; }
+      .btn-action:hover { background: var(--hover); color: var(--text); }
+
+      .check-row { display: flex; align-items: flex-start; gap: 14px; margin: 12px 0; }
+      .check-row input { margin-top: 6px; width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+      [contenteditable]:empty:before { content: "Start typing..."; color: var(--text-dim); opacity: 0.5; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+
+    <div id="contextMenu">
+      <div class="menu-item" id="menuPin"><span>Pin</span> <span>📌</span></div>
+      <div class="menu-item" id="menuDelete" style="color: #ff3b30"><span>Delete</span> <span>✕</span></div>
+    </div>
+
+    <div id="sidebar">
+      <div class="brand">Fraction</div>
+      <button class="btn-action" onclick="createNewNote()">+ New Note</button>
+      <button class="btn-action" onclick="createNewFolder()" style="margin-bottom: 24px;">+ Folder</button>
+      <div id="notesList"></div>
+    </div>
+
+    <div id="main-container">
+      <div class="toolbar">
+        <button class="tool-btn" onclick="toggleTheme()">🌓</button>
+        <div style="width:1px; background: var(--border); height: 20px;"></div>
+        <button class="tool-btn" id="btn-bold" onclick="format('bold')">B</button>
+        <button class="tool-btn" id="btn-italic" onclick="format('italic')">I</button>
+        <button class="tool-btn" onclick="addChecklist()">Checklist</button>
+        <div style="width:1px; background: var(--border); height: 20px;"></div>
+        <button class="tool-btn" onclick="adjustFontSize(-2)">A-</button>
+        <button class="tool-btn" onclick="adjustFontSize(2)">A+</button>
+        <div style="width:1px; background: var(--border); height: 20px;"></div>
+        <button class="tool-btn" onclick="exportNote()">Export</button>
+      </div>
+
+      <div id="editor-scroll">
+        <div id="editor-content">
+          <input id="titleInput" placeholder="Untitled" autocomplete="off" />
+          <div id="content" contenteditable="true"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let state = {
+        notes: JSON.parse(localStorage.getItem('fraction_v14') || '[]'),
+        folders: JSON.parse(localStorage.getItem('fraction_folders_v14') || '["Notes"]'),
+        currentIdx: 0,
+        darkMode: localStorage.getItem('fraction_theme') === 'dark'
+      };
+
+      let menuTargetIdx = null;
+
+      if (state.notes.length === 0) {
+        state.notes.push({ title: 'Welcome', content: 'Wipe away the noise.', folder: 'Notes', pinned: false });
+      }
+      if(state.darkMode) document.body.classList.add('dark-mode');
+
+      function save() {
+        const note = state.notes[state.currentIdx];
+        if(note) {
+          note.content = document.getElementById('content').innerHTML;
+          note.title = document.getElementById('titleInput').value;
+        }
+        localStorage.setItem('fraction_v14', JSON.stringify(state.notes));
+        localStorage.setItem('fraction_folders_v14', JSON.stringify(state.folders));
+        localStorage.setItem('fraction_theme', state.darkMode ? 'dark' : 'light');
+      }
+
+      function renderSidebar() {
+        const list = document.getElementById('notesList');
+        list.innerHTML = '';
+        state.folders.forEach(folderName => {
+          const group = document.createElement('div');
+          group.className = 'folder-group';
+          group.innerHTML = `<div class="folder-header">${folderName}</div>`;
+          const folderNotes = state.notes.map((n, i) => ({...n, originalIdx: i})).filter(n => n.folder === folderName).sort((a, b) => (b.pinned - a.pinned));
+          folderNotes.forEach(note => {
+            const item = document.createElement('div');
+            item.className = `note-item ${note.originalIdx === state.currentIdx ? 'active' : ''}`;
+            item.innerHTML = `<span>${note.title || 'Untitled'}</span> ${note.pinned ? '📌' : ''}`;
+            item.onclick = () => { save(); state.currentIdx = note.originalIdx; loadNote(); renderSidebar(); };
+            item.oncontextmenu = (e) => { e.preventDefault(); menuTargetIdx = note.originalIdx; const menu = document.getElementById('contextMenu'); menu.style.display = 'block'; menu.style.left = e.pageX + 'px'; menu.style.top = e.pageY + 'px'; };
+            group.appendChild(item);
+          });
+          list.appendChild(group);
+        });
+      }
+
+      function loadNote() {
+        const note = state.notes[state.currentIdx];
+        if(!note) return;
+        document.getElementById('titleInput').value = note.title || '';
+        document.getElementById('content').innerHTML = note.content || '';
+        updateToolbar();
+      }
+
+      function toggleTheme() {
+        state.darkMode = !state.darkMode;
+        document.body.classList.toggle('dark-mode');
         save();
-        renderSidebar();
-    }
-    menuTarget = null;
-    document.getElementById('contextMenu').style.display = 'none';
-}
+      }
 
-function contextDelete() {
-    if (!menuTarget) return;
-    const idx = state.notes.indexOf(menuTarget);
-    if (idx === -1) {
-        menuTarget = null;
-        document.getElementById('contextMenu').style.display = 'none';
-        return;
-    }
-    if (confirm('Delete this note?')) {
-        state.notes.splice(idx, 1);
-        if(state.notes.length === 0) state.notes.push({ title: '', content: '', folder: 'Notes', pinned: false });
+      function format(cmd) {
+        document.execCommand(cmd, false, null);
+        updateToolbar();
+        save();
+      }
+
+      // --- NEW DOCS STYLE RESIZING ---
+      function adjustFontSize(px) {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        const container = selection.anchorNode.parentElement;
+        const currentFontSize = window.getComputedStyle(container).fontSize;
+        const newFontSize = (parseFloat(currentFontSize) + px) + 'px';
+
+        // Apply style specifically to selection
+        const span = document.createElement('span');
+        span.style.fontSize = newFontSize;
+
+        if (!selection.isCollapsed) {
+          // If text is highlighted
+          try {
+            span.appendChild(range.extractContents());
+            range.insertNode(span);
+          } catch(e) {
+            // Fallback for messy HTML
+            document.execCommand('fontSize', false, '1');
+          }
+        } else {
+          // If just cursor (no highlight), insert an empty span and put cursor inside
+          span.innerHTML = '&#8203;'; // Zero-width space to hold the cursor
+          range.insertNode(span);
+          
+          const newRange = document.createRange();
+          newRange.setStart(span, 1);
+          newRange.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        }
+        
+        save();
+      }
+
+      function updateToolbar() {
+        const b = document.getElementById('btn-bold');
+        const i = document.getElementById('btn-italic');
+        if(!b || !i) return;
+        document.queryCommandState('bold') ? b.classList.add('active') : b.classList.remove('active');
+        document.queryCommandState('italic') ? i.classList.add('active') : i.classList.remove('active');
+      }
+
+      function addChecklist() {
+        const html = `<div class="check-row"><input type="checkbox"><div contenteditable="true" style="outline:none;flex:1"></div></div>`;
+        document.getElementById('content').focus();
+        document.execCommand('insertHTML', false, html);
+      }
+
+      function createNewNote() {
+        save();
+        state.notes.unshift({ title: '', content: '', folder: 'Notes', pinned: false });
         state.currentIdx = 0;
-        save();
-        loadNote();
-        renderSidebar();
-    }
-    menuTarget = null;
-    document.getElementById('contextMenu').style.display = 'none';
-}
+        loadNote(); renderSidebar();
+      }
+
+      function createNewFolder() {
+        const name = prompt("Folder name:");
+        if(name) { state.folders.push(name); save(); renderSidebar(); }
+      }
+
+      function exportNote() {
+        const note = state.notes[state.currentIdx];
+        const blob = new Blob([note.content], {type: 'text/html'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = (note.title || 'Untitled') + '.html';
+        link.click();
+      }
+
+      document.getElementById('titleInput').oninput = () => { state.notes[state.currentIdx].title = document.getElementById('titleInput').value; renderSidebar(); save(); };
+      document.getElementById('content').oninput = () => { updateToolbar(); save(); };
+      document.getElementById('content').onmouseup = updateToolbar;
+      document.getElementById('content').onkeyup = updateToolbar;
+      window.onclick = () => document.getElementById('contextMenu').style.display = 'none';
+
+      document.getElementById('menuPin').onclick = () => { state.notes[menuTargetIdx].pinned = !state.notes[menuTargetIdx].pinned; save(); renderSidebar(); };
+      document.getElementById('menuDelete').onclick = (e) => {
+        e.stopPropagation();
+        if(confirm("Delete this note?")) {
+            state.notes.splice(menuTargetIdx, 1);
+            if(state.notes.length === 0) state.notes.push({ title: '', content: '', folder: 'Notes', pinned: false });
+            state.currentIdx = 0;
+            save(); loadNote(); renderSidebar();
+        }
+      };
+
+      renderSidebar();
+      loadNote();
+    </script>
+  </body>
+</html>
